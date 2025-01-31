@@ -13,11 +13,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint,EarlyStopping
 
 
 def main(args):
-    """
-    Training script given .yaml config
-    Example usage:
-        1) `python train.py --config_filepath chaosbench/configs/fno_s2s.yaml`
-    """
+
     pl.seed_everything(args.seed)
 
     config_filepath = 'configs/hgnn_gcn_edge.yaml'

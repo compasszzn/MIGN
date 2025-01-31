@@ -18,4 +18,3 @@ model_args:
     epochs: 50
     t_max: 500
     head: 4
-    RevIN: False
