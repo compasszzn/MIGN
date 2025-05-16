@@ -19,6 +19,8 @@ cd MIGN
 without sh embedding
 python main.py 
 
+see process_data for getting data
+
 with sh embedding
 python main.py --sh_after --sh_before
 ```
