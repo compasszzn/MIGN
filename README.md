@@ -21,6 +21,9 @@ python main.py
 
 see process_data for getting data
 
-with sh embedding
+w/o sh embedding only mesh
+python main.py 
+
+w sh embedding
 python main.py --sh_after --sh_before
 ```
