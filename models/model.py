@@ -12,10 +12,11 @@ from dataset import dataset
 import dgl
 import pickle
 from tqdm import tqdm
-from dataset.dataset import TemporalHeterogeneousDataset
+from dataset.dataset import TemporalHeterogeneousDataset,TemporalHeterogeneousRealTimeDataset
 import copy
 import pdb
-
+from thop import profile
+from torchstat import stat
 class HGNNModel(pl.LightningModule):
 
     def __init__(
@@ -34,12 +35,9 @@ class HGNNModel(pl.LightningModule):
             self.climatology = pickle.load(f)
         self.output_length=self.data_args['output_length']
         self.input_length=self.data_args['input_length']
-        # Initialize model
-        # ocean_vars = self.data_args.get('ocean_vars', [])
-        hidden_size = self.model_args['hidden_size'] 
-        
-        if 'hgnn_gcn_edge_wo_sh' == self.model_args['model_name']:
-            self.model = HGNN_GCN_EDGE_WO_SH(model_args=self.model_args,data_args=self.data_args)
+
+        self.model = HGNN_GCN_EDGE_WO_SH(model_args=self.model_args,data_args=self.data_args)
+
         self.loss = self.init_loss_fn()
 
         self.mae_loss = self.init_loss_mae_fn()
@@ -59,28 +57,54 @@ class HGNNModel(pl.LightningModule):
         return loss
     
     def forward(self, graph,timestamp,sh_embedding):
-
+        # flops, params = profile(self.model, inputs=(graph,timestamp,sh_embedding))
         return self.model(graph,timestamp,sh_embedding)
 
+    def on_train_batch_start(self, batch, batch_idx, dataloader_idx=0):
+        self.batch_start_time = torch.cuda.Event(enable_timing=True)
+        self.batch_end_time = torch.cuda.Event(enable_timing=True)
+        self.batch_start_time.record()
+
+    def on_train_batch_end(self, outputs, batch, batch_idx, dataloader_idx=0):
+        self.batch_end_time.record()
+        torch.cuda.synchronize()
+        elapsed_time = self.batch_start_time.elapsed_time(self.batch_end_time) / 1000.0
+        self.log("train_full_step_time", elapsed_time, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+
+    def on_test_batch_start(self, batch, batch_idx, dataloader_idx=0):
+        self.test_batch_start_time = torch.cuda.Event(enable_timing=True)
+        self.test_batch_end_time = torch.cuda.Event(enable_timing=True)
+        self.test_batch_start_time.record()
+
+    def on_test_batch_end(self, outputs, batch, batch_idx, dataloader_idx=0):
+        self.test_batch_end_time.record()
+        torch.cuda.synchronize()
+        elapsed_time = self.test_batch_start_time.elapsed_time(self.test_batch_end_time) / 1000.0  # 单位为秒
+        self.log("test_step_time", elapsed_time, on_step=True, prog_bar=True, logger=True)
+
     def training_step(self, batch, batch_idx):
+
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+
+        start.record()
         loss = 0
         graph=batch[0]
         concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            concatenated_feature = torch.stack(features, dim=1)#(batch*node,output_length,1)
-            concatenated_features.append(concatenated_feature)
+        node_type = self.data_args['feature']
+        features = [graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
+        concatenated_feature = torch.stack(features, dim=1)#(batch*node,output_length,1)
+        concatenated_features.append(concatenated_feature)
         label=torch.concatenate(concatenated_features,dim=0)
 
         output_graph = self(graph,batch[1],batch[2])
         output_concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [output_graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            output_concatenated_feature = torch.stack(features, dim=1)
-
-            output_concatenated_features.append(output_concatenated_feature)
+        node_type = self.data_args['feature']
+        features = [output_graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
+        output_concatenated_feature = torch.stack(features, dim=1)
+        output_concatenated_features.append(output_concatenated_feature)
         predict=torch.concatenate(output_concatenated_features,dim=0)
-
+        # pdb.set_trace()
         loss=self.loss(predict,label)  
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
 
@@ -91,18 +115,18 @@ class HGNNModel(pl.LightningModule):
         loss = 0
         graph=batch[0]
         concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            concatenated_feature = torch.stack(features, dim=1)
-            concatenated_features.append(concatenated_feature)
+        node_type = self.data_args['feature']
+        features = [graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
+        concatenated_feature = torch.stack(features, dim=1)
+        concatenated_features.append(concatenated_feature)
         label=torch.concatenate(concatenated_features,dim=0)
 
         output_graph = self(graph,batch[1],batch[2])
         output_concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [output_graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            output_concatenated_feature = torch.stack(features, dim=1)
-            output_concatenated_features.append(output_concatenated_feature)
+        node_type = self.data_args['feature']
+        features = [output_graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
+        output_concatenated_feature = torch.stack(features, dim=1)
+        output_concatenated_features.append(output_concatenated_feature)
         predict=torch.concatenate(output_concatenated_features,dim=0)
 
         loss=self.loss(predict,label)  
@@ -112,72 +136,35 @@ class HGNNModel(pl.LightningModule):
         loss = 0
         graph=batch[0]
         concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            concatenated_feature = torch.stack(features, dim=1)
-            concatenated_feature = (concatenated_feature*self.climatology[node_type]['std']) + self.climatology[node_type]['mean']
-            concatenated_features.append(concatenated_feature)
+        node_type = self.data_args['feature']
+        features = [graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
+        concatenated_feature = torch.stack(features, dim=1)
+        concatenated_feature = (concatenated_feature*self.climatology[node_type]['std']) + self.climatology[node_type]['mean']
+        concatenated_features.append(concatenated_feature)
         label=torch.concatenate(concatenated_features,dim=0)
         
         output_graph = self(graph,batch[1],batch[2])
         output_concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [output_graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            output_concatenated_feature = torch.stack(features, dim=1)
-            # if node_type=="accumulated_precipitation":
-            #     output_concatenated_feature = self.custom_relu(output_concatenated_feature,0.015,-0.3261)
-            # elif node_type=="fresh_snow":
-            #     output_concatenated_feature = self.custom_relu(output_concatenated_feature,0.025,-0.1451)
-            # else:
-            #     raise KeyError
-            output_concatenated_feature = (output_concatenated_feature*self.climatology[node_type]['std']) + self.climatology[node_type]['mean']
-            output_concatenated_features.append(output_concatenated_feature)
+        node_type = self.data_args['feature']
+        features = [output_graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
+        output_concatenated_feature = torch.stack(features, dim=1)
+        output_concatenated_feature = (output_concatenated_feature*self.climatology[node_type]['std']) + self.climatology[node_type]['mean']
+        output_concatenated_features.append(output_concatenated_feature)
         predict=torch.concatenate(output_concatenated_features,dim=0)
+
 
         loss=self.loss(predict,label) 
-        # mae_loss = self.mae_loss(predict,label)   
-        # self.log("test_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
-        # self.log("mae_loss", mae_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
-        assert not torch.isnan(loss).any()
-        flag=0
-        for i,node_type in enumerate(self.data_args['predict_vars']):
-            for day in range(self.output_length):
-                each_loss=self.loss(predict[flag:flag+concatenated_features[i].shape[0],day],label[flag:flag+concatenated_features[i].shape[0],day])
-                each_loss_mae=self.mae_loss(predict[flag:flag+concatenated_features[i].shape[0],day],label[flag:flag+concatenated_features[i].shape[0],day])
-                each_loss_rmse=self.rmse_loss(predict[flag:flag+concatenated_features[i].shape[0],day],label[flag:flag+concatenated_features[i].shape[0],day])
-                assert not torch.isnan(each_loss).any()
-                self.log(f"{node_type} in day {day+1} rmse",each_loss_rmse, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
-                self.log(f"{node_type} in day {day+1} mse",each_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
-                self.log(f"{node_type} in day {day+1} mae",each_loss_mae, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
-            flag=flag+concatenated_features[i].shape[0]
+        rmse_loss = self.rmse_loss(predict,label)
+        mae_loss = self.mae_loss(predict,label)
+        self.log("rmse_loss", rmse_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
+        self.log("mse_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
+        self.log("mae_loss", mae_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
+        for day in range(self.output_length):
+            each_loss=self.loss(predict[:,day],label[:,day])
+            self.log(f"day {day+1}",each_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
+
 
         return loss
-    def predict_step(self,  batch, batch_idx):
-        loss = 0
-        graph=batch[0]
-        concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            concatenated_feature = torch.stack(features, dim=1)
-            concatenated_feature = (concatenated_feature*self.climatology[node_type]['std']) + self.climatology[node_type]['mean']
-            concatenated_features.append(concatenated_feature)
-        label=torch.concatenate(concatenated_features,dim=0)
-        
-        output_graph = self(graph,batch[1],batch[2])
-        output_concatenated_features = []
-        for node_type in self.data_args['predict_vars']:
-            features = [output_graph.nodes[node_type].data[f't{self.input_length+t}'] for t in range(self.output_length)]
-            output_concatenated_feature = torch.stack(features, dim=1)
-            # if node_type=="accumulated_precipitation":
-            #     output_concatenated_feature = self.custom_relu(output_concatenated_feature,0.015,-0.3261)
-            # elif node_type=="fresh_snow":
-            #     output_concatenated_feature = self.custom_relu(output_concatenated_feature,0.025,-0.1451)
-            # else:
-            #     raise KeyError
-            output_concatenated_feature = (output_concatenated_feature*self.climatology[node_type]['std']) + self.climatology[node_type]['mean']
-            output_concatenated_features.append(output_concatenated_feature)
-        predict=torch.concatenate(output_concatenated_features,dim=0)
-        return predict[:,0,0],label[:,0,0], graph.nodes[node_type].data['latitude'][:,0], graph.nodes[node_type].data['longitude'][:,0], None
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.model_args['learning_rate'])
@@ -191,11 +178,9 @@ class HGNNModel(pl.LightningModule):
 
 
     def setup(self, stage=None):
-        self.train_dataset=TemporalHeterogeneousDataset(data_dir=self.data_args['data_dir'],years=self.data_args['train_years'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],climatology=self.climatology)
-        self.val_dataset=TemporalHeterogeneousDataset(data_dir=self.data_args['data_dir'],years=self.data_args['val_years'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],climatology=self.climatology)
-        self.test_dataset=TemporalHeterogeneousDataset(data_dir=self.data_args['data_dir'],years=self.data_args['test_years'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],climatology=self.climatology)
-        self.predict_dataset = TemporalHeterogeneousDataset(data_dir=self.data_args['data_dir'],years=self.data_args['test_years'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],climatology=self.climatology)
-        
+        self.train_dataset=TemporalHeterogeneousDataset(data_dir=self.data_args['data_dir'],years=self.data_args['train_years'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],climatology=self.climatology,data_args=self.data_args)
+        self.val_dataset=TemporalHeterogeneousDataset(data_dir=self.data_args['data_dir'],years=self.data_args['val_years'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],climatology=self.climatology,data_args=self.data_args)
+        self.test_dataset=TemporalHeterogeneousDataset(data_dir=self.data_args['data_dir'],years=self.data_args['test_years'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],climatology=self.climatology,data_args=self.data_args)
 
     def train_dataloader(self):
         return GraphDataLoader(self.train_dataset, 
@@ -206,6 +191,3 @@ class HGNNModel(pl.LightningModule):
     def test_dataloader(self):
         return GraphDataLoader(self.test_dataset, 
                           batch_size=self.data_args['batch_size'], shuffle=False, num_workers=self.model_args['num_workers'])
-    def predict_dataloader(self):
-        return GraphDataLoader(self.predict_dataset, 
-                          batch_size=1, shuffle=False, num_workers=self.model_args['num_workers'])

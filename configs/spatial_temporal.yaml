@@ -1,0 +1,13 @@
+data_args:
+    batch_size: 1
+    data_dir: '/data/zzn/insitu/nips'
+    # climatology_dir: 'data_interpolate/step1/data_filtered/climatology.pkl'
+    input_length: 1
+    output_length: 1
+
+
+model_args:
+    hidden_size: 64
+    learning_rate: 0.001
+    num_workers: 64
+    t_max: 500

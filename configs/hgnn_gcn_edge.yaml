@@ -1,20 +1,18 @@
 data_args:
     batch_size: 4
-    train_years: [2012,2013,2014,2015,2016,2017]
-    val_years: [2018]
-    test_years: [2019]
-    data_dir: '/data/insitu/insitu_daily_st'
-    embedding_dir: '/data/insitu/insitu_daily_st'
-    climatology_dir: '/data/insitu/insitu_daily_st/climatology_wind.npy'
+    train_years: [2017,2018,2019,2020]
+    val_years: [2021]
+    test_years: [2022]
+
+    data_dir: '/data/zzn/insitu/nips'
+    embedding_dir: '/data/zzn/insitu/nips'
+    climatology_dir: '/data/zzn/insitu/nips/climatology.npy'
     input_length: 1
     output_length: 1
-    # vars: ['fresh_snow']
-    # predict_vars: ['fresh_snow']
 
 model_args:
     hidden_size: 64
     learning_rate: 0.001
     num_workers: 16
-    epochs: 50
     t_max: 500
     head: 4
