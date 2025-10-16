@@ -90,3 +90,8 @@ python data/process_data/step4_generate_graph_pyg_step.py --input_day 1 --output
 # Multi-step Input → Multi-step Outputt
 python data/process_data/step4_generate_graph_pyg_multi_step.py --input_day 3 --output_day 4
 ```
+
+### Run the code
+```
+python /home/zinanzheng/project/MIGN/main.py
+```
