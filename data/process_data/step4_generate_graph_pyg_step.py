@@ -23,13 +23,11 @@ def haversine(lon1, lat1, lon2, lat2):
 def main(args):
 
     variables = [
-        # 'MAX', 
-        # 'MIN', 
-        # "PRCP",
-        # "SLP",
-        # "WDSP",
-        # "STP",
-        # "MXSPD",
+        'MAX', 
+        'MIN', 
+        "SLP",
+        "WDSP",
+        "MXSPD",
         "DEWP"
     ]
 
@@ -45,7 +43,6 @@ def main(args):
         # Load CSV files
         csv_files = sorted([
             f for f in (folder_path / variable).glob('*.csv')
-            # if 2019 <= int(f.stem.split('-')[0]) <= 2019
         ])
 
         output_dir = os.path.join(args.base_path, f"pyg_{variable}_{d_max}_graph_step_{args.input_day}")
@@ -82,22 +79,20 @@ def main(args):
             n = len(latitudes)
 
             for k in range(n):
-                # 当前点坐标
+
                 lat1, lon1 = latitudes[k], longitudes[k]
-                # 计算与其他点的距离
+
                 distances = haversine(lon1, lat1, longitudes, latitudes)
                 
-                # 选择距离小于 d_max 的点作为边
                 valid_neighbors = distances < d_max
-                valid_indices = np.where(valid_neighbors)[0]  # 获取所有符合条件的点的索引
+                valid_indices = np.where(valid_neighbors)[0]  
                 
 
-                # 保存为稀疏矩阵的边索引和权重
                 for neighbor_idx, weight in zip(valid_indices, distances[valid_indices]):
                     edge_indices.append((k, neighbor_idx))
                     edge_values.append(weight)
 
-            edge_indices = torch.tensor(edge_indices).t().contiguous()  # 转置得到正确格式
+            edge_indices = torch.tensor(edge_indices).t().contiguous() 
             edge_values = torch.tensor(edge_values, dtype=torch.float32)
 
             graph = Data(
@@ -121,7 +116,7 @@ if __name__ == "__main__":
                         help='path to csv data')
     parser.add_argument('--ratio', type=float, default=0.1,
                         help='path to csv data')
-    parser.add_argument('--input_day', type=int, default=4,
+    parser.add_argument('--input_day', type=int, default=1,
                         help='path to csv data')
     parser.add_argument('--output_day', type=int, default=1,
                         help='path to csv data')

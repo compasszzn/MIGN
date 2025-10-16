@@ -53,3 +53,40 @@ pip install -e .
 # Install Torch Spatiotemporal (TSL)
 pip install torch-spatiotemporal
 ```
+
+## 📦 Meta Data Download
+
+The metadata are obtained from the **Global Summary of the Day (GSOD)** dataset provided by NOAA:  
+🔗 [https://www.ncei.noaa.gov/data/global-summary-of-the-day/archive/](https://www.ncei.noaa.gov/data/global-summary-of-the-day/archive/)
+
+Please **manually download** the data for the years **2017–2024** and place them in the following directory: /realtime/Dataset/
+
+
+## Data Processing Pipeline
+
+Navigate to the processing directory:
+```bash
+cd data/process_data
+# Filter Features; Note: Modify base_dir and output_dir in the script before running.
+python data/process_data/step0_filter_feature.py
+# Note: Modify folder_path in the script before running.
+python data/process_data/step1_get_union_station.py
+# Compute Climatology Statistics; Note: Modify base_path and output_path in the script before running.
+python data/process_data/step2_climatology.py
+```
+
+### Data Preparation for MIGN
+```
+# One-step Input → One-step Output
+python data/process_data/step3_generate_graph_dgl_step.py --input_day 1 --output_day 1
+# Multi-step Input → Multi-step Output
+python data/process_data/step3_generate_graph_dgl_multi_step.py --input_day 3 --output_day 4
+```
+
+### Data Preparation for Baselines
+```
+# One-step Input → One-step Output
+python data/process_data/step4_generate_graph_pyg_step.py --input_day 1 --output_day 1
+# Multi-step Input → Multi-step Outputt
+python data/process_data/step4_generate_graph_pyg_multi_step.py --input_day 3 --output_day 4
+```

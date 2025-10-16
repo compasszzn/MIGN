@@ -5,22 +5,13 @@ from tqdm import tqdm
 # Define the folder path
 folder_path = Path('/mnt/hda/zzn/realtime/nips')
 
-# Get all CSV files in the folder
-# csv_files = sorted(folder_path.glob('*.csv'), key=lambda f: f.stat().st_size)
-
-
-
-# Initialize variable to store the union of primary_station_id
 variables = [
     "DEWP",
-    # "MXSPD",
-    # "GUST",
-    # "STP",
-# "PRCP",
-# "SLP",
-# "WDSP",
-#  "MAX",
-#  "MIN"
+    "MXSPD",
+    "SLP",
+    "WDSP",
+    "MAX",
+    "MIN"
 ]
 for variable in variables:
     station_info = pd.DataFrame(columns=['station_id', 'latitude', 'longitude'])

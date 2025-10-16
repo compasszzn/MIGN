@@ -24,42 +24,55 @@ def main(args):
 
     variables = [
         'MAX', 
-        # 'air_temperature_mean', 
         'MIN', 
+        # # "PRCP",
+        "SLP",
+        "WDSP",
+        # # "STP",
+        "MXSPD",
+        "DEWP"
     ]
 
-    d_max = 20
+    
     for variable in variables:
-        complete_data = []
+        d_max = 20
         folder_path = Path(args.base_path)
 
         # Load station IDs
-        station_data = pd.read_csv(f"{args.base_path}/unique_primary_station_ids_{variable}_tune.csv")
+        station_data = pd.read_csv(f"{args.base_path}/unique_primary_station_ids_{variable}_tune.csv", dtype={'station_id': str})
         station_ids = station_data['station_id'].tolist()
 
         # Load CSV files
         csv_files = sorted([
             f for f in (folder_path / variable).glob('*.csv')
-            if f.stem[:4] in ["2022","2023","2024"]
         ])
 
-        output_dir = os.path.join(args.base_path, f"Realtime_{variable}_20_graph_2022_2024")
+        output_dir = os.path.join(args.base_path, f"pyg_{variable}_{d_max}_graph_step_{args.input_day}_outstep_{args.output_day}")
         os.makedirs(output_dir, exist_ok=True)
+        
+        for i in tqdm(range(len(csv_files) - args.input_day - args.output_day + 1), desc=f"Processing {variable}"):
+            masks = []
+            daily_df_input_all = []
+            for k in range(args.input_day):
+                
+                daily_df_input = pd.read_csv(csv_files[i+k], dtype={'station_id': str})
+                selected_input_values = torch.from_numpy(daily_df_input.set_index('station_id').reindex(station_ids)['observation_value'].values).to(torch.float32)
+                masks.append(~torch.isnan(selected_input_values))
+                daily_df_input_all.append(selected_input_values)
+                # print(csv_files[i+k])
 
-        for i in tqdm(range(len(csv_files[:-1])), desc=f"Processing {variable}"):
-            daily_df_input = pd.read_csv(csv_files[i])
-            daily_df_output = pd.read_csv(csv_files[i+1])
+            daily_df_output_all = []
+            for k in range(args.output_day):
 
-            # Check if the file is interpolated or not
-            # is_interpolated = file.stem.endswith(f'v1_interpolated_{args.method}')
+                daily_df_output = pd.read_csv(csv_files[i+args.input_day+k], dtype={'station_id': str})
+                selected_output_values = torch.from_numpy(daily_df_output.set_index('station_id').reindex(station_ids)['observation_value'].values).to(torch.float32)
+                masks.append(~torch.isnan(selected_output_values))
+                daily_df_output_all.append(selected_output_values)
+                # print(csv_files[i+args.input_day+k])
 
-            selected_input_values = torch.from_numpy(daily_df_input.set_index('station_id').reindex(station_ids)['observation_value'].values).to(torch.float32)
-            selected_output_values = torch.from_numpy(daily_df_output.set_index('station_id').reindex(station_ids)['observation_value'].values).to(torch.float32)
-
-            mask = ~torch.isnan(selected_input_values) & ~torch.isnan(selected_output_values) 
-
-            x = selected_input_values[mask]
-            y = selected_output_values[mask]
+            mask = torch.stack(masks).all(dim=0)  # shape: (N,)
+            x = torch.stack(daily_df_input_all,dim=1)[mask]
+            y = torch.stack(daily_df_output_all,dim=1)[mask]
 
             stations = station_data[['station_id', 'latitude', 'longitude']]
 
@@ -76,22 +89,17 @@ def main(args):
             n = len(latitudes)
 
             for k in range(n):
-                # 当前点坐标
                 lat1, lon1 = latitudes[k], longitudes[k]
-                # 计算与其他点的距离
                 distances = haversine(lon1, lat1, longitudes, latitudes)
-                
-                # 选择距离小于 d_max 的点作为边
-                valid_neighbors = distances < d_max
-                valid_indices = np.where(valid_neighbors)[0]  # 获取所有符合条件的点的索引
-                
 
-                # 保存为稀疏矩阵的边索引和权重
+                valid_neighbors = distances < d_max
+                valid_indices = np.where(valid_neighbors)[0] 
+
                 for neighbor_idx, weight in zip(valid_indices, distances[valid_indices]):
                     edge_indices.append((k, neighbor_idx))
                     edge_values.append(weight)
 
-            edge_indices = torch.tensor(edge_indices).t().contiguous()  # 转置得到正确格式
+            edge_indices = torch.tensor(edge_indices).t().contiguous() 
             edge_values = torch.tensor(edge_values, dtype=torch.float32)
 
             graph = Data(
@@ -106,14 +114,18 @@ def main(args):
             date_str = csv_files[i].name.split('.')[0]
             torch.save(graph, os.path.join(output_dir, f"{date_str}.pt"))
 
-        print(f"Complete data saved to {output_dir}/{date_str}.pt")
+        print(f"Complete data saved to {output_dir}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--base_path', type=str, default='/mnt/hda/zzn/realtime/Processed',
+    parser.add_argument('--base_path', type=str, default='/mnt/hda/zzn/realtime/nips',
                         help='path to csv data')
     parser.add_argument('--ratio', type=float, default=0.1,
+                        help='path to csv data')
+    parser.add_argument('--input_day', type=int, default=3,
+                        help='path to csv data')
+    parser.add_argument('--output_day', type=int, default=4,
                         help='path to csv data')
     args = parser.parse_args()
     main(args)

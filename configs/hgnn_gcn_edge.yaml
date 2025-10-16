@@ -1,8 +1,8 @@
 data_args:
     batch_size: 4
-    train_years: [2017,2018,2019,2020]
-    val_years: [2021]
-    test_years: [2022]
+    train_years: [2017,2018,2019,2020,2021,2022]
+    val_years: [2023]
+    test_years: [2024]
 
     data_dir: '/data/zzn/insitu/nips'
     embedding_dir: '/data/zzn/insitu/nips'

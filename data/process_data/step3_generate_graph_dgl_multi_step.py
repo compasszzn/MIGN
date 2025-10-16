@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 import dgl
 import pandas as pd
 import torch
@@ -18,18 +18,16 @@ def haversine(lon1, lat1, lon2, lat2):
     dlon = lon2 - lon1[:, None]
     dlat = lat2 - lat1[:, None]
 
-    # 使用广播来计算哈弗辛公式
     a = np.sin(dlat / 2)**2 + np.cos(lat1[:, None]) * np.cos(lat2) * np.sin(dlon / 2)**2
     c = 2 * np.arcsin(np.sqrt(a))
     
-    r = 6371000/1000000  # 地球半径（米）
+    r = 6371000/1000000  
     return c * r
 
 def main(args):
     node_types = [
         'MAX', 
         'MIN', 
-        # "STP",
         "SLP",
         "WDSP",
         "MXSPD",
@@ -43,6 +41,8 @@ def main(args):
         else:
             end_date = datetime(year+1, 1, args.input_day+args.output_day-1)#
         dates = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range((end_date - start_date).days + 1)]
+        # dates = dates[327:330]
+        # dates = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(6)]
         all_label_dict={}
         distance_cache = {}
         node_data = {}
@@ -127,8 +127,13 @@ def main(args):
             distance_cache[node_type] = torch.tensor(distance_cache[node_type], dtype=torch.float32).to('cuda') 
             for t in tqdm(range(len(dates)- args.input_day-args.output_day+1),desc=f"Building {node_type} edge feature"):
                 input_node_features = node_data[node_type][:, t:t+args.input_day].to('cuda')
-                output_node_features = node_data[node_type][:, t+args.input_day].to('cuda')
-                mask = ~torch.isnan(output_node_features)
+                output_node_features = node_data[node_type][:, t+args.input_day:t+args.input_day+args.output_day].to('cuda')
+
+                mask = ~torch.isnan(output_node_features).any(dim=1)
+
+                # for mask_output_day in range(args.output_day):
+                #     mask = ~torch.isnan(output_node_features[:,mask_output_day]) & mask
+                
                 for mask_input_day in range(args.input_day):
                     mask = ~torch.isnan(input_node_features[:,mask_input_day]) & mask
 
@@ -155,7 +160,7 @@ def main(args):
                 edges[('healpix', f't{t}_to_{node_type}', node_type)][0].extend(edge_src_healpix.cpu().numpy())
                 edges[('healpix', f't{t}_to_{node_type}', node_type)][1].extend(edge_dst_healpix.cpu().numpy())
                 distances[('healpix', f't{t}_to_{node_type}', node_type)].extend(node_to_healpix_distances[edge_dst_healpix,edge_src_healpix ].cpu().numpy())
-
+                
                 del input_node_features,output_node_features,valid_nodes,node_to_healpix_distances,nearest_nodes_indices,nearest_nodes
                 del edge_src_nodes, edge_dst_nodes, nearest_healpix_indices, edge_src_healpix, edge_dst_healpix
                 torch.cuda.empty_cache()
@@ -169,7 +174,7 @@ def main(args):
 
             current_date = start_date + timedelta(days=i)
             date_str = current_date.strftime("%Y-%m-%d")
-            output_file = os.path.join(args.base_path,f"dgl_neighbor_{number_of_nearest_neighbour_k}_step_{args.input_day}_refine_{args.refinement_level}", f"input_day_{args.input_day}_output_day_{args.output_day}_{date_str}.bin")
+            output_file = os.path.join(args.base_path,f"dgl_neighbor_{number_of_nearest_neighbour_k}_step_{args.input_day}_outstep_{args.output_day}_refine_{args.refinement_level}", f"input_day_{args.input_day}_output_day_{args.output_day}_{date_str}.bin")
 
             edges_graph={}
             distances_graph={}
@@ -217,9 +222,9 @@ if __name__ == "__main__":
                         help='path to csv data')
     parser.add_argument('--refinement_level', type=int, default=3,
                         help='HEALPix refinement_level')
-    parser.add_argument('--input_day', type=int, default=1,
+    parser.add_argument('--input_day', type=int, default=3,
                         help='input day')
-    parser.add_argument('--output_day', type=int, default=1,
+    parser.add_argument('--output_day', type=int, default=4,
                         help='output day')
     args = parser.parse_args()
     main(args)
