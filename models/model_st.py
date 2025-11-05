@@ -11,7 +11,7 @@ from dataset import dataset
 import pickle
 from tqdm import tqdm
 from torch_geometric.loader import DataLoader
-from dataset.dataset import SpatialTemporalDataset,STDataset,STRealTimeDataset
+from dataset.dataset import STDataset
 import pdb
 from thop import profile
 import copy
@@ -50,7 +50,7 @@ class SpatialTemporal(pl.LightningModule):
             self.model = ST_DyGrAE.Model(node_features=self.data_args['input_length']+input_feature,filters=self.model_args['hidden_size'],output_length=self.output_length)
         elif 'TGCN' == self.model_args['model_name']:
             self.model = ST_TGCN.Model(node_features=self.data_args['input_length']+input_feature,filters=self.model_args['hidden_size'],output_length=self.output_length)
-        elif 'STConv' == self.model_args['model_name']:
+        elif 'STGCN' == self.model_args['model_name']:
             self.model = ST_STConv.Model(node_features=self.data_args['input_length']+input_feature,filters=self.model_args['hidden_size'],output_length=self.output_length,feature=self.data_args['feature'])
         elif 'A3TGCN' == self.model_args['model_name']:
             self.model = ST_A3TGCN.Model(periods=1,node_features=self.data_args['input_length']+2,filters=self.model_args['hidden_size'],output_length=self.output_length)
@@ -166,46 +166,6 @@ class SpatialTemporal(pl.LightningModule):
                 assert not torch.isnan(each_loss).any()
                 self.log(f"day {day+1}",each_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True,batch_size=self.data_args['batch_size'])
         return loss
-    def predict_step(self,  graph, batch_idx):
-        
-        if len(graph.y.shape) ==1:
-            y_hat, *_ = self(graph)#graph.x.shape [11030,1]
-            pdb.set_trace()
-            if self.output_length==1:
-                y_hat=y_hat[:,0]#y_hat.shape torch.Size([11030])
-            # pdb.set_trace()
-            graph.y = (graph.y*self.climatology[self.data_args['feature']]['std']) + self.climatology[self.data_args['feature']]['mean']
-            y_hat = (y_hat*self.climatology[self.data_args['feature']]['std']) + self.climatology[self.data_args['feature']]['mean']
-            return graph.y,y_hat,graph.latitudes,graph.longitudes,graph.mask
-        else:
-            
-            predict=[]
-            for i in range(graph.y.shape[1]):
-                input_graph = copy.deepcopy(graph)
-                if i ==0:
-                    pass
-                else:
-                    input_graph.x = y_hat
-                # pdb.set_trace()
-                y_hat, *_ = self(input_graph)
-                predict.append(y_hat)
-            # pdb.set_trace()
-            predict = torch.concatenate(predict,dim=1)
-            # pdb.set_trace()
-            graph.y = (graph.y*self.climatology[self.data_args['feature']]['std']) + self.climatology[self.data_args['feature']]['mean']
-            predict = (predict*self.climatology[self.data_args['feature']]['std']) + self.climatology[self.data_args['feature']]['mean']
-            total_mae_loss = self.mae_loss(predict,graph.y)
-            total_mse_loss = self.loss(predict,graph.y)
-            mae_loss =[]
-            loss =[]
-            for k in range( predict.shape[1]):
-                rmse_loss = self.rmse_loss(predict[:,k],graph.y[:,k])
-                mae_loss.append(self.mae_loss(predict[:,k],graph.y[:,k]))
-                loss.append(self.loss(predict[:,k],graph.y[:,k]))
-
-
-            return mae_loss,loss,total_mae_loss,total_mse_loss,graph.latitudes,graph.longitudes,graph.mask
-                
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.model_args['learning_rate'])
@@ -222,7 +182,7 @@ class SpatialTemporal(pl.LightningModule):
         self.train_dataset=STDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],feature=self.data_args['feature'],split='train',data_args=self.data_args)
         self.val_dataset=STDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],feature=self.data_args['feature'],split='val',data_args=self.data_args)
         self.test_dataset=STDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],feature=self.data_args['feature'],split='test',data_args=self.data_args)
-        self.predict_dataset = STDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=3,feature=self.data_args['feature'],split='test',data_args=self.data_args)
+        # self.predict_dataset = STDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=3,feature=self.data_args['feature'],split='test',data_args=self.data_args)
         # self.train_dataset=STRealTimeDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],feature=self.data_args['feature'],split='train',data_args=self.data_args)
         # self.val_dataset=STRealTimeDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],feature=self.data_args['feature'],split='val',data_args=self.data_args)
         # self.test_dataset=STRealTimeDataset(data_dir=self.data_args['data_dir'],input_length=self.data_args['input_length'],output_length=self.data_args['output_length'],feature=self.data_args['feature'],split='test',data_args=self.data_args)

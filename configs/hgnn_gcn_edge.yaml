@@ -4,9 +4,9 @@ data_args:
     val_years: [2023]
     test_years: [2024]
 
-    data_dir: '/data/zzn/insitu/nips'
-    embedding_dir: '/data/zzn/insitu/nips'
-    climatology_dir: '/data/zzn/insitu/nips/climatology.npy'
+    data_dir: '/data/zzn/insitu/data'
+    embedding_dir: '/data/zzn/insitu/data'
+    climatology_dir: '/data/zzn/insitu/data/climatology.npy'
     input_length: 1
     output_length: 1
 

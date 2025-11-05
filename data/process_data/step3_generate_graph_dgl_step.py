@@ -211,7 +211,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--base_path', type=str, default='/mnt/hda/zzn/realtime/nips',
+    parser.add_argument('--base_path', type=str, default='/data/zzn/insitu/data',
                         help='path to csv data')
     parser.add_argument('--number_of_nearest_neighbour', type=int, default=10,
                         help='path to csv data')

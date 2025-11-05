@@ -13,7 +13,7 @@ import pdb
 
 def main(args):
     pl.seed_everything(args.seed)
-    if args.model in ['STConv','DyGrAE','STAR','GTN','MPNNLSTM','GPS','tasimp','tasamp','ttsimp','ttsamp','ReDyNet','DualCast','GCLSTM','DCRNN','GConvGRU','GConvLSTM','TGCN','AGCRN','MSTGCN','GWNET','hdtts']:
+    if args.model in ['STGCN','DyGrAE','STAR','GTN','MPNNLSTM','GPS','tasimp','tasamp','ttsimp','ttsamp','ReDyNet','DualCast','GCLSTM','DCRNN','GConvGRU','GConvLSTM','TGCN','AGCRN','MSTGCN','GWNET','hdtts']:
         config_filepath = 'configs/spatial_temporal.yaml'
         with open(config_filepath, 'r') as config_filepath:
             hyperparams = yaml.load(config_filepath, Loader=yaml.FullLoader)
@@ -70,17 +70,17 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',default='hdtts')#tasamp,ttsamp,dygrae,stgcn
+    parser.add_argument('--model',default='tasamp')#tasamp,ttsamp,dygrae,stgcn
     parser.add_argument('--pooling',default='kmis')
-    parser.add_argument('--feature',default='WDSP',help="['MAX','MIN','DEWP',  'SLP', 'WDSP', 'MXSPD']")
+    parser.add_argument('--feature',default='MXSPD',help="['MAX','MIN','DEWP',  'SLP', 'WDSP', 'MXSPD']")
     parser.add_argument('--project',default='flops')
     parser.add_argument('--input',default='0')
     parser.add_argument('--seed',type=int,default=42)
     parser.add_argument('--input_length',type=int,default=1)
     parser.add_argument('--output_length',type=int,default=1)
     parser.add_argument('--ratio',type=int,default=0)
-    parser.add_argument('--sh_before',action='store_false', default=True)
-    parser.add_argument('--sh_after',action='store_false', default=True)
+    parser.add_argument('--sh_before',action='store_true', default=False)
+    parser.add_argument('--sh_after',action='store_true', default=False)
     parser.add_argument('--sh_level',type=int, default=3)
     parser.add_argument('--refinement_level',type=int, default=3)
     args = parser.parse_args()

@@ -112,7 +112,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--base_path', type=str, default='/mnt/hda/zzn/realtime/nips',
+    parser.add_argument('--base_path', type=str, default='/data/zzn/insitu/data',
                         help='path to csv data')
     parser.add_argument('--ratio', type=float, default=0.1,
                         help='path to csv data')

@@ -54,7 +54,23 @@ pip install -e .
 pip install torch-spatiotemporal
 ```
 
-## 📦 Meta Data Download
+## Processed Data
+
+We provide **processed datasets** for both **baseline models** and **MIGN** at  
+- **spherical level 3**  
+- **HEALPix level 3**
+
+These datasets are designed for **one-step input → one-step output** prediction tasks.
+
+You can directly download the processed data from our Hugging Face repository:  
+👉 [compasszzn/MIGN](https://huggingface.co/datasets/compasszzn/MIGN)
+
+> **Note:**  
+> You can safely skip the *Data Preparation* sections — the provided datasets are already preprocessed and ready to use.
+
+## Data Preparation
+
+### 📦 Meta Data Download
 
 The metadata are obtained from the **Global Summary of the Day (GSOD)** dataset provided by NOAA:  
 🔗 [https://www.ncei.noaa.gov/data/global-summary-of-the-day/archive/](https://www.ncei.noaa.gov/data/global-summary-of-the-day/archive/)
@@ -62,7 +78,7 @@ The metadata are obtained from the **Global Summary of the Day (GSOD)** dataset 
 Please **manually download** the data for the years **2017–2024** and place them in the following directory: /realtime/Dataset/
 
 
-## Data Processing Pipeline
+### Data Processing Pipeline
 
 Navigate to the processing directory:
 ```bash
@@ -91,7 +107,28 @@ python data/process_data/step4_generate_graph_pyg_step.py --input_day 1 --output
 python data/process_data/step4_generate_graph_pyg_multi_step.py --input_day 3 --output_day 4
 ```
 
-### Run the code
+### Spherical Harmonics for MIGN
+
+We compute the **spherical harmonics** following the implementation from  
+👉 [MarcCoru/locationencoder](https://github.com/MarcCoru/locationencoder)
+
+For detailed examples, refer to the notebook:  
+[`baseline/locationencoder/test.ipynb`](baseline/locationencoder/test.ipynb)
+
+In the default setting, we provide **level-3 spherical harmonics embeddings** for both **station nodes** and **HEALPix nodes**, saved in the following files:
+
+- `MAX_embeddings_3.pt`  
+- `WDSP_embeddings_3.pt`  
+- `...`  
+- `3_healpix_embeddings_level_3.pt`
+
+Place all embedding files in the folder before running the models.
+
+## Now you can run the baseline and MIGN
 ```
-python /home/zinanzheng/project/MIGN/main.py
+python /home/zinanzheng/project/MIGN/main.py --model MIGN --sh_before --sh_after #with location embedding
+python /home/zinanzheng/project/MIGN/main.py --model MIGN #without location embedding
+python /home/zinanzheng/project/MIGN/main.py --model tasamp
+python /home/zinanzheng/project/MIGN/main.py --model STGCN
 ```
+

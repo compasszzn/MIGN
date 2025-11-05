@@ -3,7 +3,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 # Define the folder path
-folder_path = Path('/mnt/hda/zzn/realtime/nips')
+folder_path = Path('/data/zzn/insitu/data')
 
 variables = [
     "DEWP",

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 # 数据目录
 base_dir = "/mnt/hda/zzn/realtime/Dataset"
-output_dir = "/mnt/hda/zzn/realtime/nips"
+output_dir = "/data/zzn/insitu/data"
 from tqdm import tqdm
 os.makedirs(output_dir, exist_ok=True)
 def fahrenheit_to_kelvin(fahrenheit):

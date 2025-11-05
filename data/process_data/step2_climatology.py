@@ -60,9 +60,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--base_path', type=str, default='/mnt/hda/zzn/realtime/nips',
+    parser.add_argument('--base_path', type=str, default='/data/zzn/insitu/data',
                         help='path to csv data')
-    parser.add_argument('--output_path', type=str, default='/mnt/hda/zzn/realtime/nips/climatology.npy',
+    parser.add_argument('--output_path', type=str, default='/data/zzn/insitu/data/climatology.npy',
                         help='path to csv data')
     args = parser.parse_args()
     main(args)
